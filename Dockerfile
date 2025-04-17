@@ -1,23 +1,20 @@
-# syntax=docker/dockerfile:1.4
-FROM --platform=$BUILDPLATFORM python:3.13-alpine3.21 AS builder
+# Use Python 3.13 slim image
+FROM python:3.13-slim
 
-#copy current folder (including /app) into current docker folder
-COPY . .
-
-#RUN yum install -y uwsgi which gcc
-#RUN apk add uwsgi which gcc
-RUN apk add --no-cache uwsgi gcc musl-dev libffi-dev
-
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt /app
-COPY app.ini /app
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install -r requirements.txt
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-#Run uwsgi with the configuration in the .ini file
-CMD ["uwsgi","--ini","app.ini"]
+# Copy the application code
+COPY . .
 
-#Expose port 90 of the container to the outside
-EXPOSE 90
+# Use PORT environment variable with a default
+ENV PORT=8080
+
+# Command to run the application
+CMD exec gunicorn --bind :$PORT app.wsgi:app
